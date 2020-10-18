@@ -1,8 +1,15 @@
 # unifi-docker
 
+## `latest` tag
+
+For now `latest` tracks `latest-5` which is 5.14.x. This is due to some breaking changes when upgrading from 5.14.x to 6.0.x. 
+At some time in the near future `latest` will get moved to the 6.0.x branch. This is your grace period to either upgrade to 6.0.x manually and ensure nothing breaks
+or move yourself to some 5.14.x tag that holds you there instead of continuing to track `latest`.
+
 ## Run as non-root User
 
-It is suggested you start running this as a non root user. The default right now is to run as root but if you set the environment variable RUNAS_UID0 to false then the image will run as a special unfi user with the uid/gid 999/999. You should ideally set your data and logs to owned by the proper gid. The [environment variables section](https://github.com/jacobalberty/unifi-docker/blob/master/README.md#environment-variables) has more details. At some point in the future this feature may default to on and I personally run all of my own containers with it on. So turning it on for your own containers will help prevent any surprises.
+It is suggested you start running this as a non root user. The default right now is to run as root but if you set the docker run flag `--user` to `unifi` then the image will run as a special unfi user with the uid/gid 999/999. You should ideally set your data and logs to owned by the proper gid.
+You will not be able to bind to lower ports by default. If you also pass the docker run flag `--sysctl` with `net.ipv4.ip_unprivileged_port_start=0` then you will be able to freely bind to whatever port you wish. This should not be needed if you are using the default ports.
 
 ## Mongo and Docker for windows
  Unifi uses mongo store its data. Mongo uses the fsync() system call on its data files. Because of how docker for windows works you can't bind mount `/unifi/db/data` on a docker for windows container. Therefore `-v ~/unifi:/unifi` won't work.
@@ -12,27 +19,24 @@ It is suggested you start running this as a non root user. The default right now
 
 | Tag | Description |
 |-----|-------------|
-| [`latest`, `stable`, `6.0`](https://github.com/jacobalberty/unifi-docker/blob/master/Dockerfile) | Tracks UniFi stable version - 6.0.20 as of 2020-09-14 [Change Log 6-0-20](https://community.ui.com/releases/UniFi-Network-Controller-6-0-20/3ddd1684-6747-4a66-a038-5ff0b25f4027)|
-| [`lts`, `5.6`](https://github.com/jacobalberty/unifi-docker/blob/lts/Dockerfile) | Tracks UniFi LTS stable version - 5.6.40 as of 2018-09-10 |
+| [`stable-6`, `6.0`](https://github.com/jacobalberty/unifi-docker/blob/master/Dockerfile) | Tracks UniFi stable version - 6.0.23 as of 2020-09-23 [Change Log 6-0-23](https://community.ui.com/releases/UniFi-Network-Controller-6-0-23/6ee72622-e3ca-4ebe-9e82-97fe7cca2094)|
+| [`latest`, `latest-5`, `stable-5`](https://github.com/jacobalberty/unifi-docker/blob/lts/Dockerfile) | Tracks UniFi 5.14 stable version - 5.14.23 as of 2020-09-14 |
 | [`rc`](https://github.com/jacobalberty/unifi-docker/blob/rc/Dockerfile) | Tracks UniFi "Release Candidate", The latest release candidate may flip between the two branches maintained by Ubiquiti so it is advised you tag off of the version you want directly instead of the `rc` tag. |
+| [`multiarch`](https://github.com/jacobalberty/unifi-docker/blob/multiarch/Dockerfile) | Tracks UniFi stable version but is built with amd64, arm64, and (for now) armhf support - 6.0.23 as of 2020-09-23 [Change Log 6-0-23](https://community.ui.com/releases/UniFi-Network-Controller-6-0-23/6ee72622-e3ca-4ebe-9e82-97fe7cca2094)|
 
 ### Latest Release Candidate tags
 
 | Version | Latest Tag |
 |---------|------------|
-| 6.0.x   | [`6.0.20-rc`](https://github.com/jacobalberty/unifi-docker/blob/6.0.20-rc/Dockerfile) |
+| 6.0.x   | [`6.0.27-rc`](https://github.com/jacobalberty/unifi-docker/blob/6.0.27-rc/Dockerfile) |
 
 These tags generally track the UniFi APT repository. We do lead the repository a little when it comes to pushing the latest version. The latest version gets pushed when it moves from `release candidate` to `stable` instead of waiting for it to hit the repository.
 
 In adition to these tags you may tag specific versions as well, for example `jacobalberty/unifi:5.6.40` will get you unifi 5.6.40 no matter what the current version is. Release candidates now exist both under the `rc` tag and for tags with the extension `-rc` ie `jacobalberty/unifi:5.6.18-rc`. It is advised to use the specific versions as the `rc` tag may jump from 5.6.x to 5.8.x then back to 5.6.x as new release candidates come out.
 
-#### Old `sc` tag
-
-The old `sc` tag has been deprecated and replaced with `rc` due to changes from ubnt. `sc` branch still exists just as a pointer to the new `rc` branch. whereas the version tags going forward will be under `-rc` instead.
-
 ## Description
 
-This is a containerized version of [Ubiqiti Network](https://www.ubnt.com/)'s Unifi Controller version 5.
+This is a containerized version of [Ubiqiti Network](https://www.ubnt.com/)'s Unifi Controller.
 
 The following options may be of use:
 
@@ -45,7 +49,7 @@ Example to test with
 ```bash
 mkdir -p unifi/data
 mkdir -p unifi/log
-docker run --rm --init -p 8080:8080 -p 8443:8443 -p 3478:3478/udp -p 10001:10001/udp -e TZ='Africa/Johannesburg' -v ~/unifi:/unifi --name unifi jacobalberty/unifi:stable
+docker run --rm --init -p 8080:8080 -p 8443:8443 -p 3478:3478/udp -e TZ='Africa/Johannesburg' -v ~/unifi:/unifi --name unifi jacobalberty/unifi:stable
 ```
 
 **Note** you must omit `-v ~/unifi:/unifi` on windows, but you can use a local volume e.g. `-v unifi:/unifi` (omit the leading ~/) to persist the data on a local volume.
@@ -173,18 +177,6 @@ New name: `/unifi/log`
 
 ## Environment Variables:
 
-### `BIND_PRIV`
-
-Default: `true`
-
-This is used to enable binding to ports less than 1024 when running the UniFi service as a restricted user. On some docker filesystem combinations setcap may not work so you would need to set this to false.
-
-### `RUNAS_UID0`
-
-Default: `true`
-
-This is used to determine whether or not the UniFi service runs as a privileged (root) user. The default value is `true` but it is recommended to use `false` instead.
-
 ### `UNIFI_HTTP_PORT`
 
 Default: `8080`
@@ -196,12 +188,6 @@ This is the HTTP port used by the Web interface. Browsers will be redirected to 
 Default: `8443`
 
 This is the HTTPS port used by the Web interface.
-
-### `UNIFI_UID` and `UNIFI_GID`
-
-Default: `999` for both
-
-These variables set the UID and GID for the user and group the UniFi service runs as when `RUNAS_UID0` is set to false
 
 ### `TZ`
 
@@ -255,8 +241,6 @@ Maps to `unifi.db.name`.
 ### 3478/udp - STUN service
 
 ### 6789/tcp - Speed Test (unifi5 only)
-
-### 10001/udp - UBNT Discovery
 
 See [UniFi - Ports Used](https://help.ubnt.com/hc/en-us/articles/218506997-UniFi-Ports-Used)
 
